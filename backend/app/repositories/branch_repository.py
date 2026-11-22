@@ -22,6 +22,20 @@ class BranchRepository:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def get_by_id_and_gym(
+        self, branch_id: uuid.UUID, gym_id: uuid.UUID
+    ) -> GymBranch | None:
+        stmt = select(GymBranch).where(
+            GymBranch.id == branch_id, GymBranch.gym_id == gym_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def update(self, branch: GymBranch) -> GymBranch:
+        await self.session.flush()
+        await self.session.refresh(branch)
+        return branch
+
     async def get_by_slug(self, gym_id: uuid.UUID, slug: str) -> GymBranch | None:
         stmt = select(GymBranch).where(
             GymBranch.gym_id == gym_id, GymBranch.slug == slug.lower().strip()

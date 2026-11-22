@@ -15,6 +15,7 @@ import type {
   ApiErrorResponse,
   BranchCreate,
   BranchRead,
+  BranchUpdate,
   DashboardSummaryResponse,
   GymCreate,
   GymDetailRead,
@@ -291,9 +292,27 @@ export class FitCoreApiClient {
       });
     },
 
+    get: async (gymId: string, branchId: string): Promise<BranchRead> => {
+      return this.request<BranchRead>(`/gyms/${gymId}/branches/${branchId}`, {
+        gymId,
+      });
+    },
+
     create: async (gymId: string, data: BranchCreate): Promise<BranchRead> => {
       return this.request<BranchRead>(`/gyms/${gymId}/branches`, {
         method: "POST",
+        gymId,
+        body: JSON.stringify(data),
+      });
+    },
+
+    update: async (
+      gymId: string,
+      branchId: string,
+      data: BranchUpdate
+    ): Promise<BranchRead> => {
+      return this.request<BranchRead>(`/gyms/${gymId}/branches/${branchId}`, {
+        method: "PATCH",
         gymId,
         body: JSON.stringify(data),
       });

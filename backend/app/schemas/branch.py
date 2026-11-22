@@ -38,6 +38,13 @@ class BranchUpdate(BaseModel):
     is_main: bool | None = None
     is_active: bool | None = None
 
+    @field_validator("email", "phone", "address", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v: str | None) -> str | None:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
 
 class BranchRead(BranchBase):
     model_config = ConfigDict(from_attributes=True)

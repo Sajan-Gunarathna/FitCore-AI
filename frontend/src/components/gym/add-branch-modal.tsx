@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { BranchRead } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,7 +116,7 @@ export function AddBranchModal({
       onBranchAdded(created);
       onClose();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         if (err.status === 409) {
           setError(
             `A branch with slug "${slug}" already exists in this gym. Please choose a different slug.`

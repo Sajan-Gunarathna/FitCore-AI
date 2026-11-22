@@ -27,11 +27,7 @@ interface NavItem {
   disabled?: boolean;
 }
 
-export interface DashboardSidebarProps {
-  onAddBranchClick?: () => void;
-}
-
-export function DashboardSidebar({ onAddBranchClick }: DashboardSidebarProps) {
+export function DashboardSidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -66,7 +62,7 @@ export function DashboardSidebar({ onAddBranchClick }: DashboardSidebarProps) {
     },
     {
       label: "Branches",
-      href: "#",
+      href: "/dashboard/branches",
       icon: <Building2 className="h-4 w-4" />,
     },
     {
@@ -130,30 +126,6 @@ export function DashboardSidebar({ onAddBranchClick }: DashboardSidebarProps) {
                     </div>
                   )}
                 </div>
-              );
-            }
-
-            if (item.label === "Branches") {
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    if (onAddBranchClick) {
-                      onAddBranchClick();
-                    }
-                    setIsMobileOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1A232D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B8FF3B]"
-                  title="View / Add Branches"
-                >
-                  <div className="shrink-0">{item.icon}</div>
-                  {!isCollapsed && (
-                    <div className="flex items-center justify-between w-full min-w-0">
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                  )}
-                </button>
               );
             }
 

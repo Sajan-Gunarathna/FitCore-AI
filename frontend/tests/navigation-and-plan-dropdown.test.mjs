@@ -13,7 +13,7 @@ describe("Bug 1 Fix: Dashboard Sidebar Navigation & Route Recognition", () => {
     { label: "Trainers", href: "#", disabled: true },
     { label: "Membership Plans", href: "/dashboard/membership-plans" },
     { label: "Subscriptions", href: "/dashboard/subscriptions" },
-    { label: "Branches", href: "#" },
+    { label: "Branches", href: "/dashboard/branches" },
     { label: "Staff & Roles", href: "#", disabled: true },
     { label: "Settings", href: "#", disabled: true },
   ];
@@ -27,7 +27,7 @@ describe("Bug 1 Fix: Dashboard Sidebar Navigation & Route Recognition", () => {
 
   it("verifies all active navigation items have valid dashboard hrefs", () => {
     const activeNav = navItems.filter((item) => !item.disabled && item.href !== "#");
-    assert.equal(activeNav.length, 4);
+    assert.equal(activeNav.length, 5);
 
     const hrefs = activeNav.map((n) => n.href);
     assert.deepEqual(hrefs, [
@@ -35,6 +35,7 @@ describe("Bug 1 Fix: Dashboard Sidebar Navigation & Route Recognition", () => {
       "/dashboard/members",
       "/dashboard/membership-plans",
       "/dashboard/subscriptions",
+      "/dashboard/branches",
     ]);
   });
 
@@ -64,6 +65,16 @@ describe("Bug 1 Fix: Dashboard Sidebar Navigation & Route Recognition", () => {
     // Subscriptions
     assert.equal(
       isItemActive("/dashboard/subscriptions", "/dashboard/subscriptions"),
+      true
+    );
+
+    // Branches
+    assert.equal(
+      isItemActive("/dashboard/branches", "/dashboard/branches"),
+      true
+    );
+    assert.equal(
+      isItemActive("/dashboard/branches", "/dashboard/branches/new"),
       true
     );
   });
@@ -225,5 +236,62 @@ describe("Bug 2 Fix: Membership Plan Dropdown & Subscription Assignment Flow", (
       price_paid: 49.99,
     };
     assert.equal(validateSubscriptionInput(validInput).length, 0);
+  });
+});
+
+describe("Branch Management Directory Logic", () => {
+  const sampleBranches = [
+    {
+      id: "b1",
+      gym_id: "gym-1",
+      name: "ENERGYM Main",
+      slug: "main",
+      address: "100 Main St",
+      is_main: true,
+      is_active: true,
+    },
+    {
+      id: "b2",
+      gym_id: "gym-1",
+      name: "Alawwa",
+      slug: "alawwa",
+      address: "Alawwa Town Center",
+      is_main: false,
+      is_active: true,
+    },
+    {
+      id: "b3",
+      gym_id: "gym-1",
+      name: "Old Warehouse",
+      slug: "old-warehouse",
+      address: "Industrial Zone",
+      is_main: false,
+      is_active: false,
+    },
+  ];
+
+  it("filters branches by search query across name, slug, and address", () => {
+    const search = "alawwa";
+    const filtered = sampleBranches.filter(
+      (b) =>
+        b.name.toLowerCase().includes(search) ||
+        b.slug.toLowerCase().includes(search) ||
+        b.address.toLowerCase().includes(search)
+    );
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].name, "Alawwa");
+  });
+
+  it("filters branches by status correctly (main, active, inactive)", () => {
+    const mainBranches = sampleBranches.filter((b) => b.is_main);
+    assert.equal(mainBranches.length, 1);
+    assert.equal(mainBranches[0].slug, "main");
+
+    const activeBranches = sampleBranches.filter((b) => b.is_active);
+    assert.equal(activeBranches.length, 2);
+
+    const inactiveBranches = sampleBranches.filter((b) => !b.is_active);
+    assert.equal(inactiveBranches.length, 1);
+    assert.equal(inactiveBranches[0].name, "Old Warehouse");
   });
 });

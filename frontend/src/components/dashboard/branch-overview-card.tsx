@@ -1,6 +1,7 @@
 import React from "react";
+import Link from "next/link";
 import type { BranchSummaryItem } from "@/lib/api/types";
-import { Building2, Users, PlusCircle } from "lucide-react";
+import { Building2, Users, PlusCircle, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface BranchOverviewCardProps {
@@ -24,12 +25,22 @@ export function BranchOverviewCard({
           </span>
         </div>
 
-        {canManage && onAddBranch && (
-          <Button variant="outline" size="sm" onClick={onAddBranch}>
-            <PlusCircle className="h-3.5 w-3.5 text-[#B8FF3B]" />
-            <span>Add Branch</span>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/branches"
+            className="text-xs font-semibold text-[#94A3B8] hover:text-[#B8FF3B] transition flex items-center gap-1"
+          >
+            <span>Manage All</span>
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
+
+          {canManage && onAddBranch && (
+            <Button variant="outline" size="sm" onClick={onAddBranch}>
+              <PlusCircle className="h-3.5 w-3.5 text-[#B8FF3B]" />
+              <span>Add Branch</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

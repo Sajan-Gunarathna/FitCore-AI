@@ -93,3 +93,88 @@ async def test_create_duplicate_branch_slug_conflict(client: AsyncClient, seed_d
     )
     assert response.status_code == 409
     assert "already exists" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_list_branches(client: AsyncClient, seed_data: dict):
+    """Listing branches returns all branches belonging to authorized gym."""
+    owner_token = seed_data["tokens"]["owner"]
+    gym_id = seed_data["gym_alpha"].id
+
+    headers = {**auth_header(owner_token), "X-Gym-ID": str(gym_id)}
+    response = await client.get(f"/api/v1/gyms/{gym_id}/branches", headers=headers)
+    assert response.status_code == 200
+    branches = response.json()
+    assert len(branches) >= 1
+    assert branches[0]["slug"] == "downtown"
+    assert branches[0]["is_main"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_branch_detail(client: AsyncClient, seed_data: dict):
+    """Retrieve detailed information for a single branch."""
+    owner_token = seed_data["tokens"]["owner"]
+    gym_id = seed_data["gym_alpha"].id
+    branch_id = seed_data["branch_alpha"].id
+
+    headers = {**auth_header(owner_token), "X-Gym-ID": str(gym_id)}
+    response = await client.get(
+        f"/api/v1/gyms/{gym_id}/branches/{branch_id}", headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == str(branch_id)
+    assert data["name"] == "Alpha Downtown"
+
+
+@pytest.mark.asyncio
+async def test_update_branch(client: AsyncClient, seed_data: dict):
+    """Gym admin/owner can update branch details."""
+    admin_token = seed_data["tokens"]["admin"]
+    gym_id = seed_data["gym_alpha"].id
+    branch_id = seed_data["branch_alpha"].id
+
+    payload = {
+        "name": "Alpha Downtown Updated",
+        "address": "789 Main Blvd",
+        "phone": "+1 555-999-1234",
+    }
+    headers = {**auth_header(admin_token), "X-Gym-ID": str(gym_id)}
+    response = await client.patch(
+        f"/api/v1/gyms/{gym_id}/branches/{branch_id}", json=payload, headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Alpha Downtown Updated"
+    assert data["address"] == "789 Main Blvd"
+    assert data["phone"] == "+1 555-999-1234"
+
+
+@pytest.mark.asyncio
+async def test_cross_gym_branch_access_rejected(client: AsyncClient, seed_data: dict):
+    """User in Gym A cannot access or update branch in Gym B."""
+    owner_token = seed_data["tokens"]["owner"]
+    gym_alpha_id = seed_data["gym_alpha"].id
+    fake_branch_id = uuid.uuid4()
+
+    # Non-existent or other gym's branch ID returns 404
+    headers = {**auth_header(owner_token), "X-Gym-ID": str(gym_alpha_id)}
+    response = await client.get(
+        f"/api/v1/gyms/{gym_alpha_id}/branches/{fake_branch_id}", headers=headers
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_non_admin_cannot_update_branch(client: AsyncClient, seed_data: dict):
+    """Member role cannot update branch details."""
+    member_token = seed_data["tokens"]["member"]
+    gym_id = seed_data["gym_alpha"].id
+    branch_id = seed_data["branch_alpha"].id
+
+    payload = {"name": "Hacked Branch"}
+    headers = {**auth_header(member_token), "X-Gym-ID": str(gym_id)}
+    response = await client.patch(
+        f"/api/v1/gyms/{gym_id}/branches/{branch_id}", json=payload, headers=headers
+    )
+    assert response.status_code == 403

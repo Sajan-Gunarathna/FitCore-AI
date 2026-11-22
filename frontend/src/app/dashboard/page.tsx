@@ -177,7 +177,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#090D12] text-[#F8FAFC] flex">
       {/* Collapsible Sidebar (Desktop) and Drawer (Mobile) */}
-      <DashboardSidebar onAddBranchClick={() => setIsAddBranchOpen(true)} />
+      <DashboardSidebar />
 
       {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0">

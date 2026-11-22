@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import CurrentTenant, CurrentUser, RequireGymAdmin
-from app.schemas.branch import BranchCreate, BranchRead
+from app.schemas.branch import BranchCreate, BranchRead, BranchUpdate
 from app.schemas.dashboard import DashboardSummaryResponse
 from app.schemas.gym import GymCreate, GymDetailRead, GymRead
 from app.schemas.role import GymUserRoleRead, RoleAssignmentCreate
@@ -159,6 +159,59 @@ async def list_branches(
     """
     branch_service = BranchService(session)
     return await branch_service.list_branches(gym_id=tenant.gym_id)
+
+
+@router.get(
+    "/{gym_id}/branches/{branch_id}",
+    response_model=BranchRead,
+    summary="Get branch details",
+)
+async def get_branch_detail(
+    gym_id: uuid.UUID,
+    branch_id: uuid.UUID,
+    tenant: CurrentTenant,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> BranchRead:
+    """
+    Get detailed information for a specific branch.
+    Enforces tenant context resolution: fails with 404 if branch does not belong to authorized gym.
+    """
+    branch_service = BranchService(session)
+    return await branch_service.get_branch(
+        gym_id=tenant.gym_id, branch_id=branch_id
+    )
+
+
+@router.patch(
+    "/{gym_id}/branches/{branch_id}",
+    response_model=BranchRead,
+    summary="Update branch details",
+)
+async def update_branch(
+    gym_id: uuid.UUID,
+    branch_id: uuid.UUID,
+    data: BranchUpdate,
+    tenant: RequireGymAdmin,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> BranchRead:
+    """
+    Update a branch/location in the gym.
+    Requires Gym Owner or Gym Admin role in the authoritative tenant gym.
+    Uses tenant.gym_id to guarantee operation is executed against the authorized gym.
+    """
+    branch_service = BranchService(session)
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    return await branch_service.update_branch(
+        gym_id=tenant.gym_id,
+        branch_id=branch_id,
+        data=data,
+        current_user=tenant.user,
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
 
 
 # ── Gym Users & Roles ──────────────────────────────────────────────────────────
