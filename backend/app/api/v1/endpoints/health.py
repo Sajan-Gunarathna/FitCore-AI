@@ -1,7 +1,7 @@
 """Health-check endpoint."""
 
 import time
-from typing import Dict, Any
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -11,7 +11,7 @@ _START_TIME = time.time()
 
 
 @router.get("", summary="Health check")
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     """
     Returns service health status and basic metadata.
     Used by load-balancers, monitoring tools and CI smoke-tests.

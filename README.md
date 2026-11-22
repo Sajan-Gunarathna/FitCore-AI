@@ -9,10 +9,19 @@
 ```
 FitCore-AI/
 ├── backend/          # FastAPI + SQLAlchemy 2.0 async REST API
-├── frontend/         # Next.js 15 + TypeScript + Tailwind CSS
-├── mobile/           # React Native + Expo
-├── supabase/         # Supabase CLI project (migrations, seed)
-├── docs/             # Architecture & API documentation
+│   ├── app/
+│   │   ├── api/v1/   # REST route handlers (auth, gyms, health)
+│   │   ├── core/     # Config, async DB, Supabase JWKS security, deps
+│   │   ├── models/   # SQLAlchemy 2.0 ORM models (10 core entities)
+│   │   ├── schemas/  # Pydantic v2 validation & response schemas
+│   │   ├── services/ # Business logic & transactional operations
+│   │   └── repositories/ # Data access layer with eager-loading
+│   └── tests/        # 27 unit/regression tests + PostgreSQL integration tests
+├── frontend/         # Next.js 16 + TypeScript + Tailwind CSS v4
+├── mobile/           # React Native + Expo 52
+├── supabase/         # Supabase CLI project (canonical migrations & RLS)
+│   └── migrations/   # SQL DDL, composite FKs, & Row Level Security policies
+├── docs/             # Architecture, API, & Security documentation
 └── README.md
 ```
 
@@ -22,9 +31,9 @@ FitCore-AI/
 
 | Tool | Version |
 |------|---------|
-| Python | 3.11+ |
+| Python | 3.11+ (tested on Python 3.14.2) |
 | Node.js | 20+ |
-| pnpm | 9+ |
+| pnpm / npm | latest |
 | Supabase CLI | latest |
 | PostgreSQL | 15+ (via Supabase) |
 
@@ -32,93 +41,73 @@ FitCore-AI/
 
 ## Quick Start
 
-### 1. Clone & configure secrets
+### 1. Configure Secrets
 
 ```bash
-git clone <repo-url>
-cd FitCore-AI
-
 # Backend secrets
 cp backend/.env.example backend/.env
-# → Fill in SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET, DATABASE_URL
+# Fill in: DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET
 
 # Frontend secrets
 cp frontend/.env.example frontend/.env.local
-# → Fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_API_URL
+# Fill in: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_API_URL
 ```
 
-### 2. Backend (FastAPI)
+### 2. Database Migrations (Supabase CLI)
+
+Supabase CLI is the **canonical migration system**:
 
 ```bash
-cd backend
-python -m venv .venv
-# Windows:   .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-API docs → http://localhost:8000/docs  
-Health check → http://localhost:8000/api/v1/health
-
-### 3. Frontend (Next.js)
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-App → http://localhost:3000
-
-### 4. Mobile (Expo)
-
-```bash
-cd mobile
-pnpm install
-pnpm start
-```
-
-### 5. Database Migrations (Supabase CLI)
-
-```bash
+# Push migrations to Supabase
 supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
+Migration files:
+- `supabase/migrations/20261122000001_initial_core_schema.sql` (10 core tables, indexes, checks)
+- `supabase/migrations/20261122000002_row_level_security.sql` (RLS policies & security functions)
+- `supabase/migrations/20261122000003_composite_foreign_keys_and_rls_hardening.sql` (Composite FKs, role policies, and FORCE RLS)
+
+### 3. Backend (FastAPI)
+
+```bash
+cd backend
+
+# Create & activate virtual environment
+python -m venv .venv
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+# Linux / macOS:     source .venv/bin/activate
+
+pip install -r requirements.txt
+
+# Run unit and regression test suite (27 passing tests)
+python -m pytest tests/ -v
+
+# Run live PostgreSQL integration tests (requires TEST_DATABASE_URL)
+TEST_DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/postgres" python -m pytest -m integration
+
+# Run backend development server
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+- **Interactive API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check:** [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+
+### 4. Frontend (Next.js)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 ---
 
-## Development Phases
+## Multi-Tenant Security Highlights
 
-| Phase | Scope | Status |
-|-------|-------|--------|
-| **0** | Project foundation, monorepo, health-check API | ✅ Complete |
-| **1** | Auth, multi-tenant core, roles, members, plans | 🔜 |
-| **2** | Web application UI | 🔜 |
-| **3** | AI fitness features | 🔜 |
-
----
-
-## Architecture
-
-- **Multi-tenant modular monolith** — tenant isolation via `gym_id`
-- **REST API** versioned at `/api/v1`
-- **Supabase Auth** — JWT verification on every request
-- **PostgreSQL Row Level Security** for hard tenant isolation
-- **Supabase CLI migrations** as the canonical DB migration tool
-
----
-
-## Security Notes
-
-- Never commit `.env` files
-- Never expose the Supabase service-role key to the frontend
-- All gym-scoped records are isolated by `gym_id`
-- JWT signature, expiry, issuer and audience are validated server-side
-
----
-
-## License
-
-Proprietary — All rights reserved.
+1. **Authoritative Tenant Resolution:** For routes with `/gyms/{gym_id}/*`, the URL parameter is authoritative. A mismatched `X-Gym-ID` header triggers an automatic **HTTP 400 Bad Request**.
+2. **Transaction-Scoped Isolation:** Session context (`SET LOCAL app.current_user_id` and `SET LOCAL app.current_gym_id`) is set independently without clobbering, automatically reverting on transaction end.
+3. **Composite Foreign Keys:** Relationships between multi-tenant child tables (`trainer_member_assignments`, `member_subscriptions`) enforce tenant integrity at the relational engine level.
+4. **Hardened RLS Policies:** Non-owner administrators cannot assign or promote users to the `owner` role.
+5. **Superuser Awareness:** The default Supabase `postgres` user bypasses RLS; FastAPI application authorization is the primary defense, while RLS protects direct client roles (`anon`, `authenticated`) and unprivileged DB connections.
