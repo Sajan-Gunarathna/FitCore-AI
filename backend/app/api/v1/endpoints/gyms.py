@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import CurrentTenant, CurrentUser, RequireGymAdmin
 from app.schemas.branch import BranchCreate, BranchRead
+from app.schemas.dashboard import DashboardSummaryResponse
 from app.schemas.gym import GymCreate, GymDetailRead, GymRead
 from app.schemas.role import GymUserRoleRead, RoleAssignmentCreate
 from app.services.branch_service import BranchService
+from app.services.dashboard_service import DashboardService
 from app.services.gym_service import GymService
 from app.services.role_service import RoleService
 
@@ -85,6 +87,27 @@ async def get_gym_detail(
     """
     gym_service = GymService(session)
     return await gym_service.get_gym_detail(tenant.gym_id, tenant.user)
+
+
+# ── Dashboard & Analytics ─────────────────────────────────────────────────────
+@router.get(
+    "/{gym_id}/dashboard/summary",
+    response_model=DashboardSummaryResponse,
+    summary="Get gym owner dashboard aggregated metrics and analytics",
+)
+async def get_dashboard_summary(
+    gym_id: uuid.UUID,
+    tenant: RequireGymAdmin,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> DashboardSummaryResponse:
+    """
+    Get aggregated KPIs, recent member activity, upcoming membership expirations,
+    registration trends, and branch distribution for the authorized gym tenant.
+    Requires Gym Owner or Gym Admin role.
+    Uses tenant.gym_id to guarantee authoritative tenant isolation.
+    """
+    dashboard_service = DashboardService(session)
+    return await dashboard_service.get_gym_summary(gym_id=tenant.gym_id)
 
 
 # ── Branches ───────────────────────────────────────────────────────────────────

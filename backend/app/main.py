@@ -1,12 +1,16 @@
 """FitCore AI — FastAPI application entry-point."""
 
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -35,6 +39,16 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── Global Exception Handler ──────────────────────────────────────────────
+    @application.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+        detail = str(exc) if settings.app_debug else "Internal server error"
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": detail},
+        )
 
     # ── Routers ───────────────────────────────────────────────────────────────
     application.include_router(api_v1_router, prefix="/api/v1")

@@ -12,7 +12,10 @@ from app.core.database import Base
 
 class GymBranch(Base):
     __tablename__ = "gym_branches"
-    __table_args__ = (UniqueConstraint("gym_id", "slug", name="uq_gym_branch_slug"),)
+    __table_args__ = (
+        UniqueConstraint("gym_id", "slug", name="uq_gym_branch_slug"),
+        UniqueConstraint("gym_id", "id", name="uq_gym_branches_gym_id_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

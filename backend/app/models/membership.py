@@ -58,6 +58,9 @@ class MembershipPlan(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(10), default="USD", nullable=False
+    )
     billing_frequency: Mapped[str] = mapped_column(
         String(50), default=BillingFrequency.MONTHLY.value, nullable=False
     )
@@ -74,6 +77,9 @@ class MembershipPlan(Base):
 
     # Relationships
     gym: Mapped["Gym"] = relationship("Gym", back_populates="membership_plans")  # noqa: F821
+    subscriptions: Mapped[list["MemberSubscription"]] = relationship(
+        "MemberSubscription", back_populates="plan", cascade="all, delete-orphan"
+    )
 
 
 class MemberSubscription(Base):
@@ -115,10 +121,14 @@ class MemberSubscription(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     price_paid: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(10), default="USD", nullable=False
+    )
     status: Mapped[str] = mapped_column(
         String(50), default=SubscriptionStatus.ACTIVE.value, nullable=False, index=True
     )
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -128,3 +138,6 @@ class MemberSubscription(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    plan: Mapped["MembershipPlan"] = relationship("MembershipPlan", back_populates="subscriptions")

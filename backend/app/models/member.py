@@ -5,7 +5,17 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Date,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +35,12 @@ class Member(Base):
         UniqueConstraint("gym_id", "user_id", name="uq_member_user_per_gym"),
         UniqueConstraint("gym_id", "member_code", name="uq_member_code_per_gym"),
         UniqueConstraint("gym_id", "id", name="uq_members_gym_id_id"),
+        ForeignKeyConstraint(
+            ["gym_id", "branch_id"],
+            ["gym_branches.gym_id", "gym_branches.id"],
+            ondelete="SET NULL",
+            name="fk_member_branch_composite",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -36,19 +52,21 @@ class Member(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     branch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("gym_branches.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     member_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
     emergency_contact: Mapped[dict[str, Any] | None] = mapped_column(
@@ -57,6 +75,7 @@ class Member(Base):
     status: Mapped[str] = mapped_column(
         String(50), default=MemberStatus.ACTIVE.value, nullable=False, index=True
     )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -72,4 +91,4 @@ class Member(Base):
 
     # Relationships
     gym: Mapped["Gym"] = relationship("Gym", back_populates="members")  # noqa: F821
-    user: Mapped["User"] = relationship("User", back_populates="memberships")  # noqa: F821
+    user: Mapped["User | None"] = relationship("User", back_populates="memberships")  # noqa: F821

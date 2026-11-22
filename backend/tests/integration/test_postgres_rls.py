@@ -687,3 +687,112 @@ async def test_composite_foreign_keys_reject_cross_gym_relationships(
         },
     )
     assert res_valid_sub.rowcount == 1, "Valid same-gym subscription failed!"
+
+
+async def test_branch_deletion_set_null_preserves_member_and_gym_id(
+    admin_session: AsyncSession,
+):
+    """
+    Verify Task 2 (Milestone 2.5):
+    Composite FK (gym_id, branch_id) ON DELETE SET NULL (branch_id)
+    1. Deleting a branch sets member.branch_id to NULL.
+    2. Member.gym_id is NOT altered or set to NULL.
+    3. Existing member record remains intact.
+    4. Cross-gym branch assignment violates composite FK constraint.
+    """
+    tag = f"br-del-{uuid.uuid4().hex[:6]}"
+    gym_a_id = uuid.uuid4()
+    gym_b_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    branch_a_id = uuid.uuid4()
+    branch_b_id = uuid.uuid4()
+    member_id = uuid.uuid4()
+
+    # 1. Setup Gym A and Gym B
+    await admin_session.execute(
+        text("INSERT INTO auth.users (id, email) VALUES (:id, :email)"),
+        {"id": owner_id, "email": f"owner-{tag}@test.com"},
+    )
+    await admin_session.execute(
+        text("INSERT INTO public.users (id, email, full_name) VALUES (:id, :email, :name)"),
+        {"id": owner_id, "email": f"owner-{tag}@test.com", "name": f"Owner {tag}"},
+    )
+    await admin_session.execute(
+        text("""
+            INSERT INTO public.gyms (id, name, slug, created_by)
+            VALUES (:ga, :na, :sa, :uid), (:gb, :nb, :sb, :uid)
+        """),
+        {
+            "ga": gym_a_id,
+            "na": f"Gym A {tag}",
+            "sa": f"gyma-{tag}",
+            "gb": gym_b_id,
+            "nb": f"Gym B {tag}",
+            "sb": f"gymb-{tag}",
+            "uid": owner_id,
+        },
+    )
+
+    # 2. Add Branch to Gym A and Branch to Gym B
+    await admin_session.execute(
+        text("""
+            INSERT INTO public.gym_branches (id, gym_id, name, slug, is_main)
+            VALUES (:ba, :ga, 'Branch A', 'ba', false),
+                   (:bb, :gb, 'Branch B', 'bb', false)
+        """),
+        {"ba": branch_a_id, "ga": gym_a_id, "bb": branch_b_id, "gb": gym_b_id},
+    )
+
+    # 3. Add Member in Gym A assigned to Branch A
+    await admin_session.execute(
+        text("""
+            INSERT INTO public.members
+                (id, gym_id, branch_id, member_code, full_name, status)
+            VALUES (:mid, :ga, :ba, :code, 'Member A', 'active')
+        """),
+        {"mid": member_id, "ga": gym_a_id, "ba": branch_a_id, "code": f"M-{tag[:6]}"},
+    )
+
+    # 4. Confirm Cross-Gym Branch Assignment is PROHIBITED
+    sp = await admin_session.begin_nested()
+    try:
+        await admin_session.execute(
+            text("""
+                INSERT INTO public.members
+                    (id, gym_id, branch_id, member_code, full_name, status)
+                VALUES (:mid2, :ga, :bb, :code2, 'Cross Member', 'active')
+            """),
+            {
+                "mid2": uuid.uuid4(),
+                "ga": gym_a_id,
+                "bb": branch_b_id,  # Branch B belongs to Gym B!
+                "code2": f"MC-{tag[:6]}",
+            },
+        )
+        raise AssertionError(
+            "Expected foreign key integrity error for cross-gym branch assignment"
+        )
+    except (IntegrityError, DBAPIError) as exc_cross:
+        await sp.rollback()
+        err_cross = str(exc_cross).lower()
+        assert "fk_member_branch_composite" in err_cross or "foreign key" in err_cross
+
+    # 5. Delete Branch A in Gym A
+    await admin_session.execute(
+        text("DELETE FROM public.gym_branches WHERE id = :ba"),
+        {"ba": branch_a_id},
+    )
+
+    # 6. Verify Member state after Branch A deletion
+    res_member = await admin_session.execute(
+        text("SELECT id, gym_id, branch_id, full_name FROM public.members WHERE id = :mid"),
+        {"mid": member_id},
+    )
+    row = res_member.fetchone()
+    assert row is not None, "Member was deleted when branch was deleted!"
+    assert row[0] == member_id, "Member ID changed!"
+    assert row[1] == gym_a_id, (
+        f"Member gym_id was changed or nulled! Expected {gym_a_id}, got {row[1]}"
+    )
+    assert row[2] is None, f"Member branch_id was not set to NULL! Got {row[2]}"
+    assert row[3] == "Member A", "Member data corrupted!"

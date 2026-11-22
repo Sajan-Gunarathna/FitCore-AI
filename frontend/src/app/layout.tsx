@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AuthProvider } from "@/context/auth-context";
+import { GymProvider } from "@/context/gym-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,8 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-        {children}
+      <body className="min-h-screen bg-[#090D12] text-[#F8FAFC] antialiased">
+        <AuthProvider>
+          <GymProvider>{children}</GymProvider>
+        </AuthProvider>
       </body>
     </html>
   );

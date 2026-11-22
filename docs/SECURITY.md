@@ -150,3 +150,94 @@ Any attempt to associate records belonging to different gyms fails at the Postgr
 ### Symmetric Verification (Fallback)
 - Supported when `SUPABASE_JWT_SECRET` is configured for local or legacy installations.
 - Algorithm restricted strictly to `HS256`.
+
+---
+
+## 7. Frontend Security Controls (Phase 2)
+
+### Open-Redirect Mitigation (`getSafeRedirectUrl`)
+- All redirect query parameters (e.g. `?next=/dashboard`) in authentication callbacks (`/auth/callback`, `/login`) are sanitized via `frontend/src/lib/utils/redirect.ts`.
+- Relative internal paths only: must begin with `/` and reject protocol-relative `//` or scheme-prefixed destinations.
+- Defaults safely to `/dashboard`.
+
+### Client-Side Tenant Storage & Tamper Resistance
+- The active tenant is stored in browser `localStorage` under `fitcore_active_gym_id`.
+- On load, `GymProvider` validates the stored ID against the server-verified `accessibleGyms` list.
+- If a user tampers with the stored ID or attempts to inject another tenant's UUID, `GymProvider` automatically ignores the tampered value and safely falls back to the user's first legitimate gym or `null`.
+- On sign-out, `localStorage.removeItem("fitcore_active_gym_id")` and local session states are completely purged.
+
+### Client-Side P0 Desynchronization Guard
+- `FitCoreApiClient` intercepts requests targeting path-scoped gym endpoints (e.g. `/gyms/{gym_id}/*`).
+- It automatically verifies and synchronizes the outgoing `X-Gym-ID` header with `{gym_id}`.
+- Prevents accidental or malformed client calls from triggering backend 400 Bad Request desync rejections.
+
+---
+
+## 8. Dashboard RBAC & Tenancy Verification (Milestone 2.3)
+
+### Executive Dashboard Role Enforcement
+- The executive analytics dashboard endpoint (`/gyms/{gym_id}/dashboard/summary`) is protected by `RequireGymAdmin`.
+- **Allowed Roles:** Gym Owner, Gym Administrator, Platform Super-Admin.
+- **Denied Roles:** Trainer, Member, Unassigned Users. Denied with **HTTP 403 Forbidden**.
+- **Frontend Role Presentation:** The frontend conditionally renders the executive analytics view only for Owners and Administrators. Members and Trainers are presented with an explanatory role notice stating their current membership level without exposing tenant financial or executive metrics.
+
+### Stale Tenant Data Elimination
+- Switching gyms aborts the active HTTP fetch request via `AbortController`.
+- Local generation tokens discard delayed responses from previously selected gyms.
+- State is cleared to `null` on tenant change, preventing Gym A's cached metrics from rendering under Gym B.
+
+### Known Environmental Limitations
+- **Live Supabase Auth Cloud Testing:** In offline or local development environments lacking external internet connectivity or production Supabase project credentials, authentication testing relies on the asymmetric/symmetric test token fixture (`make_jwt()`) and mocked Supabase client tokens. Full live OAuth/PKCE roundtrips to remote Supabase instances require valid remote credentials (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+
+
+---
+
+## 7. Member Data Security & Role-Based Access Control (Milestone 2.4)
+
+### Walk-in Member Security & RLS Defense
+In real-world gym operations, front-desk staff register walk-in members who do not yet have an online Supabase Auth account. FitCore AI accommodates this securely without weakening tenant boundaries:
+
+1. **Nullable `user_id` on `members`:** The `members.user_id` foreign key is nullable, allowing enrollment before account creation.
+2. **PostgreSQL RLS Safety:**
+   - The RLS policy `members_select` verifies `user_id = current_app_user_id()`. When `user_id IS NULL`, this evaluates to false/null, meaning walk-in members can never be queried or impersonated by unprivileged authenticated users.
+   - Gym staff (owners, admins, assigned trainers) access member records through the security definer function `user_has_gym_role(gym_id, 'owner', 'admin')`.
+3. **Composite Branch Integrity (`fk_member_branch_composite`):**
+   - Enforces `(gym_id, branch_id) REFERENCES gym_branches(gym_id, id) ON DELETE SET NULL`.
+   - Rejects any attempt to assign a member in Gym A to a branch belonging to Gym B at the relational engine level.
+4. **Trainer Data Scoping:**
+   - Trainers query the member directory via `MemberService.list_members`, which looks up `trainer_member_assignments` for `trainer_id == trainer_profile.id` and restricts the query to assigned member IDs only.
+   - Direct member profile requests (`GET /api/v1/gyms/{gym_id}/members/{member_id}`) by a trainer verify assignment and fail closed with **HTTP 403 Forbidden** if the member is not assigned to that trainer.
+5. **Member Self-Access Scoping:**
+   - A caller with only the `member` role is restricted to viewing only their own record (`member.user_id == current_user.id`). Any attempt to query another member's profile returns **HTTP 403 Forbidden**.
+
+---
+
+## 8. Membership Plans & Subscription Security (Milestone 2.5)
+
+### Composite Foreign Key Constraints on Subscriptions
+Member subscriptions reference both the member and the plan with composite foreign keys:
+1. `(gym_id, member_id) REFERENCES members(gym_id, id) ON DELETE CASCADE` (`fk_subscription_member_composite`)
+2. `(gym_id, plan_id) REFERENCES membership_plans(gym_id, id) ON DELETE RESTRICT` (`fk_subscription_plan_composite`)
+
+This guarantees that:
+- A subscription cannot link a member from Gym A to a membership plan from Gym B at the PostgreSQL relational engine level.
+- Deleting a plan that has active subscriptions is rejected by relational constraint (`RESTRICT`), protecting audit trails and billing histories.
+
+### Column-Specific Composite `ON DELETE SET NULL (branch_id)`
+In PostgreSQL 15+, the composite foreign key on `members` uses column-specific actions:
+```sql
+CONSTRAINT fk_member_branch_composite
+FOREIGN KEY (gym_id, branch_id)
+REFERENCES public.gym_branches(gym_id, id)
+ON DELETE SET NULL (branch_id);
+```
+When a branch location is deleted or closed:
+- `branch_id` is automatically set to `NULL`.
+- `gym_id` remains unchanged and non-null, preventing foreign key cascade violations and preserving member tenancy and records.
+
+### Separation of Billing, Pricing, and Subscriptions
+In accordance with commercial SaaS boundary requirements:
+1. **Plan Pricing vs Subscription Billing:** Contracted subscription terms (`price_paid`, `currency`, `start_date`, `end_date`) are snapshotted in `member_subscriptions`. Subsequent edits to `membership_plans` (such as price increases) never retroactively alter existing active subscriptions.
+2. **Payment Gateway Boundary:** FitCore AI enforces subscription access state and period validity independently of payment gateways. External payment processors (Stripe, PayHere) are kept outside subscription state transitions to prevent fake verification vulnerabilities.
+3. **Overlapping Active Subscriptions Guard:** The subscription service prevents multiple overlapping active subscriptions for the same member, eliminating duplicate billing or ambiguous entitlement periods.
+4. **Audit Logging:** Every plan creation, plan update, plan status change, subscription assignment, renewal, and cancellation is captured in `audit_logs` with before/after deltas, actor user ID, client IP, and user agent.

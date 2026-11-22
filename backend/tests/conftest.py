@@ -34,6 +34,8 @@ TEST_AUDIENCE = "authenticated"
 settings.supabase_jwt_secret = TEST_JWT_SECRET
 settings.supabase_jwt_audience = TEST_AUDIENCE
 settings.supabase_jwt_issuer = ""
+settings.supabase_url = ""
+settings.database_url = "sqlite+aiosqlite:///:memory:"
 
 # In-memory SQLite async engine
 test_engine = create_async_engine(
