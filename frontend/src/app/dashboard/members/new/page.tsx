@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { BranchRead } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +138,7 @@ export default function RegisterMemberPage() {
         router.push(`/dashboard/members/${createdMember.id}`);
       }, 1200);
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setErrorMessage(err.detail);
       } else {
         setErrorMessage("Failed to register member. Please verify input and try again.");

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type {
   MemberRead,
   MembershipPlanRead,
@@ -108,7 +108,7 @@ function SubscriptionsContent() {
       setTotalCount(res.total);
       setTotalPages(res.total_pages || 1);
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setError(err.detail);
       } else {
         setError("Failed to load member subscriptions.");
@@ -168,7 +168,7 @@ function SubscriptionsContent() {
         setCustomPrice("");
       }
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setAssignError(err.detail);
       } else {
         setAssignError("Failed to fetch available members or plans.");
@@ -220,7 +220,7 @@ function SubscriptionsContent() {
       setAssignNotes("");
       loadSubscriptions();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setAssignError(err.detail);
       } else {
         setAssignError("Failed to assign subscription. Check active overlapping subscriptions.");
@@ -259,7 +259,7 @@ function SubscriptionsContent() {
       setRenewTarget(null);
       loadSubscriptions();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setRenewError(err.detail);
       } else {
         setRenewError("Failed to renew subscription.");
@@ -292,7 +292,7 @@ function SubscriptionsContent() {
       setCancelTarget(null);
       loadSubscriptions();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setCancelError(err.detail);
       } else {
         setCancelError("Failed to cancel subscription.");

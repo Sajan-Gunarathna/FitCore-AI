@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { BranchRead, MemberRead, PaginatedResponse } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -48,15 +48,18 @@ export default function MemberDirectoryPage() {
   const [branchFilter, setBranchFilter] = useState<string>("");
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
+  const activeGymIdRef = useRef<string | null>(null);
 
   // Debounce search input by 300ms
   useEffect(() => {
+    if (searchTerm === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
       setPage(1); // Reset to page 1 on new search
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, debouncedSearch]);
 
   const handleSignOut = async () => {
     abortControllerRef.current?.abort();
@@ -91,6 +94,8 @@ export default function MemberDirectoryPage() {
         abortControllerRef.current.abort();
       }
 
+      const currentRequestId = ++requestIdRef.current;
+      activeGymIdRef.current = gymId;
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
@@ -109,22 +114,47 @@ export default function MemberDirectoryPage() {
           },
           controller.signal
         );
-        setMembersData(response);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
+
+        if (
+          currentRequestId !== requestIdRef.current ||
+          gymId !== activeGymIdRef.current
+        ) {
           return;
         }
-        if (err instanceof ApiClientError) {
+
+        setMembersData(response);
+      } catch (err) {
+        if (
+          controller.signal.aborted ||
+          (err instanceof Error && err.name === "AbortError")
+        ) {
+          return; // Request was aborted; do not show error or update state
+        }
+        if (
+          currentRequestId !== requestIdRef.current ||
+          gymId !== activeGymIdRef.current
+        ) {
+          return;
+        }
+        if (isApiClientError(err)) {
           setError(err.detail);
         } else {
           setError("Failed to load members. Please try again.");
         }
       } finally {
-        setIsLoading(false);
+        if (currentRequestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [page, pageSize, debouncedSearch, statusFilter, branchFilter]
   );
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (activeGymId) {

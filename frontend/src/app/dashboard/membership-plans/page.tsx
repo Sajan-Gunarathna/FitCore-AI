@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { MembershipPlanRead } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,7 @@ function MembershipPlansContent() {
       setPlans(res.items);
       setTotalCount(res.total);
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setError(err.detail);
       } else {
         setError("Failed to load membership plans.");
@@ -131,7 +131,7 @@ function MembershipPlansContent() {
       setCreatePrice("49.99");
       loadPlans();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setCreateError(err.detail);
       } else {
         setCreateError("Failed to create plan. Please verify inputs.");
@@ -174,7 +174,7 @@ function MembershipPlansContent() {
       setSelectedPlan(null);
       loadPlans();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setEditError(err.detail);
       } else {
         setEditError("Failed to update plan. Please verify inputs.");
@@ -194,7 +194,7 @@ function MembershipPlansContent() {
         prev.map((p) => (p.id === plan.id ? { ...p, is_active: !p.is_active } : p))
       );
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         alert(err.detail);
       } else {
         alert("Failed to change plan status.");

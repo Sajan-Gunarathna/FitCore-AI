@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { DashboardSummaryResponse } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,10 +122,9 @@ export default function DashboardPage() {
           return;
         }
 
-        const msg =
-          err instanceof ApiClientError
-            ? err.detail
-            : "Failed to connect to dashboard analytics service.";
+        const msg = isApiClientError(err)
+          ? err.detail
+          : "Failed to connect to dashboard analytics service.";
         setSummaryError(msg);
       } finally {
         if (

@@ -161,6 +161,14 @@ export class FitCoreApiClient {
         headers,
       });
     } catch (fetchErr) {
+      // If the request was intentionally aborted or cancelled, rethrow cleanly
+      if (
+        (fetchErr instanceof Error && fetchErr.name === "AbortError") ||
+        (fetchOptions.signal as AbortSignal)?.aborted
+      ) {
+        throw fetchErr;
+      }
+
       // Windows 11 Chrome IPv6/localhost fallback: try 127.0.0.1 if localhost fails
       if (url.includes("://localhost:")) {
         try {
@@ -173,7 +181,14 @@ export class FitCoreApiClient {
             "://localhost:",
             "://127.0.0.1:"
           );
-        } catch {
+        } catch (fallbackErr) {
+          if (
+            (fallbackErr instanceof Error &&
+              fallbackErr.name === "AbortError") ||
+            (fetchOptions.signal as AbortSignal)?.aborted
+          ) {
+            throw fallbackErr;
+          }
           throw new ApiClientError(
             0,
             "Network Error",

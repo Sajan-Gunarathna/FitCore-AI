@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useGym } from "@/hooks/use-gym";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type {
   BranchRead,
   MemberDetailRead,
@@ -129,7 +129,7 @@ function MemberProfileContent() {
       setEditNotes(data.notes || "");
       setNewStatus(data.status as "active" | "inactive" | "suspended" | "pending");
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setError(err.detail);
       } else {
         setError("Failed to load member profile.");
@@ -176,7 +176,7 @@ function MemberProfileContent() {
       setMember((prev) => (prev ? { ...prev, ...updated } : null));
       setIsEditModalOpen(false);
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setEditError(err.detail);
       } else {
         setEditError("Failed to update member profile.");
@@ -203,7 +203,7 @@ function MemberProfileContent() {
       setIsStatusModalOpen(false);
       setStatusReason("");
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setStatusError(err.detail);
       } else {
         setStatusError("Failed to update status.");
@@ -243,7 +243,7 @@ function MemberProfileContent() {
         setAssignPrice("");
       }
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setAssignError(err.detail);
       } else {
         setAssignError("Failed to load active membership plans.");
@@ -295,7 +295,7 @@ function MemberProfileContent() {
       setAssignNotes("");
       loadMemberDetail();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setAssignError(err.detail);
       } else {
         setAssignError("Failed to assign subscription. Member may already have an active plan.");
@@ -332,7 +332,7 @@ function MemberProfileContent() {
       setRenewTarget(null);
       loadMemberDetail();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setRenewError(err.detail);
       } else {
         setRenewError("Failed to renew subscription.");
@@ -365,7 +365,7 @@ function MemberProfileContent() {
       setCancelTarget(null);
       loadMemberDetail();
     } catch (err) {
-      if (err instanceof ApiClientError) {
+      if (isApiClientError(err)) {
         setCancelError(err.detail);
       } else {
         setCancelError("Failed to cancel subscription.");
