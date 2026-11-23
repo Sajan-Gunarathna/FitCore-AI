@@ -179,8 +179,12 @@ class MemberRepository:
         query = (
             select(
                 TrainerMemberAssignment.trainer_id,
-                User.full_name,
-                User.email,
+                func.coalesce(
+                    func.nullif(TrainerProfile.full_name, ""),
+                    User.full_name,
+                    User.email,
+                    "Trainer",
+                ).label("trainer_name"),
                 TrainerMemberAssignment.assigned_at,
                 TrainerMemberAssignment.status,
             )
@@ -189,10 +193,11 @@ class MemberRepository:
                 (TrainerMemberAssignment.trainer_id == TrainerProfile.id)
                 & (TrainerMemberAssignment.gym_id == TrainerProfile.gym_id),
             )
-            .join(User, TrainerProfile.user_id == User.id)
+            .outerjoin(User, TrainerProfile.user_id == User.id)
             .where(
                 TrainerMemberAssignment.gym_id == gym_id,
                 TrainerMemberAssignment.member_id == member_id,
+                TrainerMemberAssignment.status == "active",
             )
             .order_by(TrainerMemberAssignment.assigned_at.desc())
         )
@@ -201,7 +206,7 @@ class MemberRepository:
         return [
             MemberTrainerSummary(
                 trainer_id=r.trainer_id,
-                trainer_name=r.full_name or r.email,
+                trainer_name=r.trainer_name,
                 assigned_at=r.assigned_at,
                 status=r.status,
             )

@@ -27,6 +27,9 @@ import type {
   MemberRead,
   MemberStatusUpdateInput,
   MemberUpdateInput,
+  MemberAssignTrainerInput,
+  MemberReassignTrainerInput,
+  MemberTrainerAssignmentRead,
   MembershipPlanCreateInput,
   MembershipPlanRead,
   MembershipPlanUpdateInput,
@@ -39,6 +42,15 @@ import type {
   SubscriptionRead,
   SubscriptionRenewInput,
   SubscriptionUpdateInput,
+  TrainerAssignedMemberSummary,
+  TrainerCreateInput,
+  TrainerDetailRead,
+  TrainerListParams,
+  TrainerMemberAssignmentCreateInput,
+  TrainerMemberReassignInput,
+  TrainerRead,
+  TrainerStatsResponse,
+  TrainerUpdateInput,
   UserProfileResponse,
 } from "./types";
 
@@ -437,6 +449,49 @@ export class FitCoreApiClient {
         }
       );
     },
+
+    assignTrainer: async (
+      gymId: string,
+      memberId: string,
+      data: MemberAssignTrainerInput
+    ): Promise<MemberTrainerAssignmentRead> => {
+      return this.request<MemberTrainerAssignmentRead>(
+        `/gyms/${gymId}/members/${memberId}/trainer`,
+        {
+          method: "POST",
+          gymId,
+          body: JSON.stringify(data),
+        }
+      );
+    },
+
+    reassignTrainer: async (
+      gymId: string,
+      memberId: string,
+      data: MemberReassignTrainerInput
+    ): Promise<MemberTrainerAssignmentRead> => {
+      return this.request<MemberTrainerAssignmentRead>(
+        `/gyms/${gymId}/members/${memberId}/trainer`,
+        {
+          method: "PATCH",
+          gymId,
+          body: JSON.stringify(data),
+        }
+      );
+    },
+
+    unassignTrainer: async (
+      gymId: string,
+      memberId: string
+    ): Promise<{ message: string }> => {
+      return this.request<{ message: string }>(
+        `/gyms/${gymId}/members/${memberId}/trainer`,
+        {
+          method: "DELETE",
+          gymId,
+        }
+      );
+    },
   };
 
   public plans = {
@@ -596,6 +651,151 @@ export class FitCoreApiClient {
           method: "PATCH",
           gymId,
           body: JSON.stringify(data),
+        }
+      );
+    },
+  };
+
+  public trainers = {
+    list: async (
+      gymId: string,
+      params: TrainerListParams = {},
+      signal?: AbortSignal
+    ): Promise<PaginatedResponse<TrainerRead>> => {
+      const queryParams = new URLSearchParams();
+      if (params.page !== undefined) queryParams.set("page", String(params.page));
+      if (params.pageSize !== undefined) queryParams.set("page_size", String(params.pageSize));
+      if (params.search) queryParams.set("search", params.search);
+      if (params.branchId) queryParams.set("branch_id", params.branchId);
+      if (params.isActive !== undefined) queryParams.set("is_active", String(params.isActive));
+      if (params.specialization) queryParams.set("specialization", params.specialization);
+
+      const queryStr = queryParams.toString();
+      const endpoint = `/gyms/${gymId}/trainers${queryStr ? `?${queryStr}` : ""}`;
+
+      return this.request<PaginatedResponse<TrainerRead>>(endpoint, {
+        gymId,
+        signal,
+      });
+    },
+
+    create: async (
+      gymId: string,
+      data: TrainerCreateInput
+    ): Promise<TrainerRead> => {
+      return this.request<TrainerRead>(`/gyms/${gymId}/trainers`, {
+        method: "POST",
+        gymId,
+        body: JSON.stringify(data),
+      });
+    },
+
+    get: async (
+      gymId: string,
+      trainerId: string,
+      signal?: AbortSignal
+    ): Promise<TrainerDetailRead> => {
+      return this.request<TrainerDetailRead>(
+        `/gyms/${gymId}/trainers/${trainerId}`,
+        {
+          gymId,
+          signal,
+        }
+      );
+    },
+
+    update: async (
+      gymId: string,
+      trainerId: string,
+      data: TrainerUpdateInput
+    ): Promise<TrainerRead> => {
+      return this.request<TrainerRead>(`/gyms/${gymId}/trainers/${trainerId}`, {
+        method: "PATCH",
+        gymId,
+        body: JSON.stringify(data),
+      });
+    },
+
+    updateStatus: async (
+      gymId: string,
+      trainerId: string,
+      isActive: boolean
+    ): Promise<TrainerRead> => {
+      return this.request<TrainerRead>(
+        `/gyms/${gymId}/trainers/${trainerId}/status`,
+        {
+          method: "PATCH",
+          gymId,
+          body: JSON.stringify({ is_active: isActive }),
+        }
+      );
+    },
+
+    getStats: async (
+      gymId: string,
+      signal?: AbortSignal
+    ): Promise<TrainerStatsResponse> => {
+      return this.request<TrainerStatsResponse>(`/gyms/${gymId}/trainers/stats`, {
+        gymId,
+        signal,
+      });
+    },
+
+    getMembers: async (
+      gymId: string,
+      trainerId: string,
+      signal?: AbortSignal
+    ): Promise<TrainerAssignedMemberSummary[]> => {
+      return this.request<TrainerAssignedMemberSummary[]>(
+        `/gyms/${gymId}/trainers/${trainerId}/members`,
+        {
+          gymId,
+          signal,
+        }
+      );
+    },
+
+    assignMember: async (
+      gymId: string,
+      trainerId: string,
+      data: TrainerMemberAssignmentCreateInput
+    ): Promise<MemberTrainerAssignmentRead> => {
+      return this.request<MemberTrainerAssignmentRead>(
+        `/gyms/${gymId}/trainers/${trainerId}/members`,
+        {
+          method: "POST",
+          gymId,
+          body: JSON.stringify(data),
+        }
+      );
+    },
+
+    reassignMember: async (
+      gymId: string,
+      trainerId: string,
+      memberId: string,
+      data: TrainerMemberReassignInput
+    ): Promise<MemberTrainerAssignmentRead> => {
+      return this.request<MemberTrainerAssignmentRead>(
+        `/gyms/${gymId}/trainers/${trainerId}/members/${memberId}/reassign`,
+        {
+          method: "POST",
+          gymId,
+          body: JSON.stringify(data),
+        }
+      );
+    },
+
+    unassignMember: async (
+      gymId: string,
+      trainerId: string,
+      memberId: string
+    ): Promise<{ message: string }> => {
+      return this.request<{ message: string }>(
+        `/gyms/${gymId}/trainers/${trainerId}/members/${memberId}`,
+        {
+          method: "DELETE",
+          gymId,
         }
       );
     },

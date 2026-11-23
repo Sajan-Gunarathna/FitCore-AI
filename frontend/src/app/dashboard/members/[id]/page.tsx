@@ -11,6 +11,7 @@ import type {
   MemberDetailRead,
   MembershipPlanRead,
   MemberSubscriptionSummary,
+  TrainerRead,
 } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ import {
   Ban,
   Clock,
   ArrowRight,
+  UserMinus,
 } from "lucide-react";
 
 function MemberProfileContent() {
@@ -101,6 +103,25 @@ function MemberProfileContent() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  // Trainer Assignment State (Milestone 2.6)
+  const [gymTrainers, setGymTrainers] = useState<TrainerRead[]>([]);
+  const [isAssignTrainerModalOpen, setIsAssignTrainerModalOpen] = useState(false);
+  const [selectedTrainerId, setSelectedTrainerId] = useState("");
+  const [trainerNotes, setTrainerNotes] = useState("");
+  const [isAssigningTrainer, setIsAssigningTrainer] = useState(false);
+  const [assignTrainerError, setAssignTrainerError] = useState<string | null>(null);
+
+  // Reassign Trainer State
+  const [isReassignTrainerModalOpen, setIsReassignTrainerModalOpen] = useState(false);
+  const [reassignNewTrainerId, setReassignNewTrainerId] = useState("");
+  const [reassignTrainerNotes, setReassignTrainerNotes] = useState("");
+  const [isReassigningTrainer, setIsReassigningTrainer] = useState(false);
+  const [reassignTrainerError, setReassignTrainerError] = useState<string | null>(null);
+
+  // Unassign Trainer State
+  const [isUnassignTrainerModalOpen, setIsUnassignTrainerModalOpen] = useState(false);
+  const [isUnassigningTrainer, setIsUnassigningTrainer] = useState(false);
+
   const isOwnerOrAdmin =
     currentRole === "owner" ||
     currentRole === "admin" ||
@@ -155,6 +176,95 @@ function MemberProfileContent() {
       loadBranches();
     });
   }, [loadMemberDetail, loadBranches]);
+
+  const fetchGymTrainers = useCallback(async () => {
+    if (!activeGymId) return;
+    try {
+      const res = await apiClient.trainers.list(activeGymId, { isActive: true, pageSize: 50 });
+      const items = res.items || [];
+      setGymTrainers(items);
+      if (items.length > 0) {
+        setSelectedTrainerId(items[0].id);
+        setReassignNewTrainerId(items[0].id);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, [activeGymId]);
+
+  const handleOpenAssignTrainer = async () => {
+    await fetchGymTrainers();
+    setTrainerNotes("");
+    setAssignTrainerError(null);
+    setIsAssignTrainerModalOpen(true);
+  };
+
+  const handleAssignTrainer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeGymId || !memberId || !selectedTrainerId) return;
+    setIsAssigningTrainer(true);
+    setAssignTrainerError(null);
+    try {
+      await apiClient.members.assignTrainer(activeGymId, memberId, {
+        trainer_id: selectedTrainerId,
+        notes: trainerNotes.trim() || null,
+      });
+      setIsAssignTrainerModalOpen(false);
+      await loadMemberDetail();
+    } catch (err) {
+      if (isApiClientError(err)) {
+        setAssignTrainerError(err.detail);
+      } else {
+        setAssignTrainerError("Failed to assign coach.");
+      }
+    } finally {
+      setIsAssigningTrainer(false);
+    }
+  };
+
+  const handleOpenReassignTrainer = async () => {
+    await fetchGymTrainers();
+    setReassignTrainerNotes("");
+    setReassignTrainerError(null);
+    setIsReassignTrainerModalOpen(true);
+  };
+
+  const handleReassignTrainer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeGymId || !memberId || !reassignNewTrainerId) return;
+    setIsReassigningTrainer(true);
+    setReassignTrainerError(null);
+    try {
+      await apiClient.members.reassignTrainer(activeGymId, memberId, {
+        new_trainer_id: reassignNewTrainerId,
+        notes: reassignTrainerNotes.trim() || null,
+      });
+      setIsReassignTrainerModalOpen(false);
+      await loadMemberDetail();
+    } catch (err) {
+      if (isApiClientError(err)) {
+        setReassignTrainerError(err.detail);
+      } else {
+        setReassignTrainerError("Failed to reassign coach.");
+      }
+    } finally {
+      setIsReassigningTrainer(false);
+    }
+  };
+
+  const handleUnassignTrainer = async () => {
+    if (!activeGymId || !memberId) return;
+    setIsUnassigningTrainer(true);
+    try {
+      await apiClient.members.unassignTrainer(activeGymId, memberId);
+      setIsUnassignTrainerModalOpen(false);
+      await loadMemberDetail();
+    } catch {
+      // Non-fatal
+    } finally {
+      setIsUnassigningTrainer(false);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -803,19 +913,27 @@ function MemberProfileContent() {
                 </CardContent>
               </Card>
 
-              {/* Assigned Trainers Card */}
+              {/* Assigned Trainers Card (Milestone 2.6) */}
               <Card className="border-[#27313D] bg-[#121922] shadow-lg">
                 <CardHeader className="border-b border-[#27313D]/40 pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Dumbbell className="h-4 w-4 text-[#B8FF3B]" />
                       <CardTitle className="text-base font-bold text-[#F8FAFC]">
-                        Assigned Trainers
+                        Personal Coaching & Trainer Assignment
                       </CardTitle>
                     </div>
-                    <span className="text-[10px] text-[#94A3B8] font-mono">
-                      {member.assigned_trainers.length} trainer{member.assigned_trainers.length === 1 ? "" : "s"}
-                    </span>
+
+                    {isOwnerOrAdmin && member.assigned_trainers.length === 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleOpenAssignTrainer}
+                        className="h-7 text-xs bg-[#B8FF3B] text-[#0B0F15] hover:bg-[#A3E635] font-semibold px-2.5"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Assign Coach
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
 
@@ -823,25 +941,50 @@ function MemberProfileContent() {
                   {member.assigned_trainers.length === 0 ? (
                     <div className="py-6 text-center space-y-2">
                       <Dumbbell className="h-8 w-8 text-[#94A3B8]/40 mx-auto" />
-                      <p className="text-xs text-[#94A3B8]">No personal trainers currently assigned.</p>
+                      <p className="text-xs text-[#94A3B8]">No personal coach currently assigned to this member.</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-[#27313D]/40">
                       {member.assigned_trainers.map((trainer) => (
-                        <div key={trainer.trainer_id} className="py-3 flex items-center justify-between text-xs">
+                        <div key={trainer.trainer_id} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
                           <div>
-                            <p className="font-bold text-[#F8FAFC]">{trainer.trainer_name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-[#F8FAFC] text-sm">{trainer.trainer_name}</p>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${getStatusBadge(
+                                  trainer.status
+                                )}`}
+                              >
+                                {trainer.status}
+                              </span>
+                            </div>
                             <p className="text-[#94A3B8] text-[11px] mt-0.5">
-                              Assigned: {new Date(trainer.assigned_at).toLocaleDateString()}
+                              Assigned on: {new Date(trainer.assigned_at).toLocaleDateString()}
                             </p>
                           </div>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${getStatusBadge(
-                              trainer.status
-                            )}`}
-                          >
-                            {trainer.status}
-                          </span>
+
+                          {isOwnerOrAdmin && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleOpenReassignTrainer}
+                                className="h-7 text-xs border-[#27313D] text-amber-400 hover:bg-amber-500/10 px-2.5"
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Change Coach
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsUnassignTrainerModalOpen(true)}
+                                className="h-7 text-xs border-[#27313D] text-rose-400 hover:bg-rose-500/10 px-2.5"
+                              >
+                                <UserMinus className="h-3 w-3 mr-1" />
+                                Unassign
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1139,6 +1282,202 @@ function MemberProfileContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ASSIGN TRAINER MODAL (Milestone 2.6) */}
+      {isAssignTrainerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-[#121922] border border-[#27313D] rounded-xl shadow-2xl p-6 relative space-y-4">
+            <button
+              onClick={() => setIsAssignTrainerModalOpen(false)}
+              className="absolute top-4 right-4 text-[#94A3B8] hover:text-[#F8FAFC]"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-[#B8FF3B]" />
+              <h2 className="text-lg font-bold text-[#F8FAFC]">Assign Coach to Member</h2>
+            </div>
+
+            {assignTrainerError && (
+              <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-lg text-red-300 text-xs">
+                {assignTrainerError}
+              </div>
+            )}
+
+            <form onSubmit={handleAssignTrainer} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#94A3B8] font-semibold mb-1">
+                  Select Coach / Trainer *
+                </label>
+                <select
+                  value={selectedTrainerId}
+                  onChange={(e) => setSelectedTrainerId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#161F2B] border border-[#27313D] text-[#F8FAFC] focus:outline-none focus:border-[#B8FF3B]"
+                >
+                  {gymTrainers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.full_name} ({t.branch_name || "Main Location"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#94A3B8] font-semibold mb-1">
+                  Coaching Goals & Notes
+                </label>
+                <textarea
+                  rows={3}
+                  value={trainerNotes}
+                  onChange={(e) => setTrainerNotes(e.target.value)}
+                  placeholder="e.g. Focus on injury rehabilitation and progressive overload..."
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#161F2B] border border-[#27313D] text-[#F8FAFC] focus:outline-none focus:border-[#B8FF3B] resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setIsAssignTrainerModalOpen(false)}
+                  disabled={isAssigningTrainer}
+                  className="h-8 text-xs border-[#27313D] text-[#94A3B8]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  type="submit"
+                  disabled={isAssigningTrainer}
+                  className="h-8 text-xs bg-[#B8FF3B] text-[#0B0F15] hover:bg-[#A3E635] font-semibold"
+                >
+                  {isAssigningTrainer ? "Assigning..." : "Confirm Coach"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REASSIGN TRAINER MODAL (Milestone 2.6) */}
+      {isReassignTrainerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-[#121922] border border-[#27313D] rounded-xl shadow-2xl p-6 relative space-y-4">
+            <button
+              onClick={() => setIsReassignTrainerModalOpen(false)}
+              className="absolute top-4 right-4 text-[#94A3B8] hover:text-[#F8FAFC]"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-amber-400" />
+              <h2 className="text-lg font-bold text-[#F8FAFC]">Change Assigned Coach</h2>
+            </div>
+
+            {reassignTrainerError && (
+              <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-lg text-red-300 text-xs">
+                {reassignTrainerError}
+              </div>
+            )}
+
+            <form onSubmit={handleReassignTrainer} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#94A3B8] font-semibold mb-1">
+                  Select New Coach *
+                </label>
+                <select
+                  value={reassignNewTrainerId}
+                  onChange={(e) => setReassignNewTrainerId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#161F2B] border border-[#27313D] text-[#F8FAFC] focus:outline-none focus:border-[#B8FF3B]"
+                >
+                  {gymTrainers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.full_name} ({t.branch_name || "Main Location"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#94A3B8] font-semibold mb-1">
+                  Reassignment Reason / Notes
+                </label>
+                <textarea
+                  rows={3}
+                  value={reassignTrainerNotes}
+                  onChange={(e) => setReassignTrainerNotes(e.target.value)}
+                  placeholder="Reason for change in coach assignment..."
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#161F2B] border border-[#27313D] text-[#F8FAFC] focus:outline-none focus:border-[#B8FF3B] resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setIsReassignTrainerModalOpen(false)}
+                  disabled={isReassigningTrainer}
+                  className="h-8 text-xs border-[#27313D] text-[#94A3B8]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  type="submit"
+                  disabled={isReassigningTrainer}
+                  className="h-8 text-xs bg-amber-400 text-[#0B0F15] hover:bg-amber-300 font-semibold"
+                >
+                  {isReassigningTrainer ? "Updating..." : "Transfer Coach"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* UNASSIGN TRAINER MODAL (Milestone 2.6) */}
+      {isUnassignTrainerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-[#121922] border border-[#27313D] rounded-xl shadow-2xl p-6 relative space-y-4">
+            <div className="flex items-center gap-2 text-rose-400">
+              <UserMinus className="h-5 w-5" />
+              <h2 className="text-base font-bold text-[#F8FAFC]">Confirm Unassignment</h2>
+            </div>
+
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
+              Are you sure you want to remove the assigned coach for this member? The member will become unassigned.
+            </p>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setIsUnassignTrainerModalOpen(false)}
+                disabled={isUnassigningTrainer}
+                className="h-8 text-xs border-[#27313D] text-[#94A3B8]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                onClick={handleUnassignTrainer}
+                disabled={isUnassigningTrainer}
+                className="h-8 text-xs bg-rose-500 text-white hover:bg-rose-600 font-semibold"
+              >
+                {isUnassigningTrainer ? "Removing..." : "Remove Coach"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -366,3 +366,122 @@ export interface SubscriptionListParams {
   expiringWithinDays?: number;
   search?: string;
 }
+
+// ── Trainer Management Schemas (Milestone 2.6) ──────────────────────────────
+export interface TrainerRead {
+  id: string;
+  gym_id: string;
+  branch_id?: string | null;
+  branch_name?: string | null;
+  user_id?: string | null;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  specializations: string[];
+  certifications: string[];
+  years_of_experience: number;
+  hourly_rate: number | string;
+  is_active: boolean;
+  assigned_member_count: number;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainerAssignedMemberSummary {
+  assignment_id: string;
+  member_id: string;
+  member_code: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  branch_id?: string | null;
+  branch_name?: string | null;
+  member_status: string;
+  assignment_status: string;
+  assigned_at: string;
+  notes?: string | null;
+}
+
+export interface TrainerDetailRead extends TrainerRead {
+  assigned_members: TrainerAssignedMemberSummary[];
+}
+
+export interface TrainerCreateInput {
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  branch_id?: string | null;
+  user_id?: string | null;
+  bio?: string | null;
+  specializations?: string[];
+  certifications?: string[];
+  years_of_experience?: number;
+  hourly_rate?: number | string;
+  joined_at?: string | null;
+  is_active?: boolean;
+}
+
+export interface TrainerUpdateInput {
+  full_name?: string;
+  email?: string | null;
+  phone?: string | null;
+  branch_id?: string | null;
+  bio?: string | null;
+  specializations?: string[];
+  certifications?: string[];
+  years_of_experience?: number;
+  hourly_rate?: number | string;
+  is_active?: boolean;
+}
+
+export interface TrainerStatsResponse {
+  total_trainers: number;
+  active_trainers: number;
+  total_assigned_members: number;
+  average_hourly_rate: number | string;
+}
+
+export interface TrainerListParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  branchId?: string;
+  isActive?: boolean;
+  specialization?: string;
+}
+
+export interface MemberTrainerAssignmentRead {
+  assignment_id: string;
+  gym_id: string;
+  trainer_id: string;
+  trainer_name: string;
+  member_id: string;
+  member_name: string;
+  status: string;
+  assigned_at: string;
+  notes?: string | null;
+}
+
+export interface TrainerMemberAssignmentCreateInput {
+  member_id: string;
+  notes?: string | null;
+}
+
+export interface TrainerMemberReassignInput {
+  new_trainer_id: string;
+  notes?: string | null;
+}
+
+export interface MemberAssignTrainerInput {
+  trainer_id: string;
+  notes?: string | null;
+}
+
+export interface MemberReassignTrainerInput {
+  new_trainer_id: string;
+  current_trainer_id?: string | null;
+  notes?: string | null;
+}

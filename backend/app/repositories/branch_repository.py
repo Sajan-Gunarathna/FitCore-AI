@@ -15,6 +15,7 @@ class BranchRepository:
     async def create(self, branch: GymBranch) -> GymBranch:
         self.session.add(branch)
         await self.session.flush()
+        await self.session.refresh(branch)
         return branch
 
     async def get_by_id(self, branch_id: uuid.UUID) -> GymBranch | None:

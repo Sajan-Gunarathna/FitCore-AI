@@ -45,10 +45,8 @@ export function DashboardSidebar() {
     },
     {
       label: "Trainers",
-      href: "#",
+      href: "/dashboard/trainers",
       icon: <Dumbbell className="h-4 w-4" />,
-      badge: "Soon",
-      disabled: true,
     },
     {
       label: "Membership Plans",

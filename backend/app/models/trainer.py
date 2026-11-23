@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Integer,
     Numeric,
     String,
     Text,
@@ -31,8 +32,13 @@ class AssignmentStatus(enum.StrEnum):
 class TrainerProfile(Base):
     __tablename__ = "trainer_profiles"
     __table_args__ = (
-        UniqueConstraint("gym_id", "user_id", name="uq_trainer_user_per_gym"),
         UniqueConstraint("gym_id", "id", name="uq_trainer_profiles_gym_id_id"),
+        ForeignKeyConstraint(
+            ["gym_id", "branch_id"],
+            ["gym_branches.gym_id", "gym_branches.id"],
+            ondelete="SET NULL",
+            name="fk_trainer_branch_composite",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -44,25 +50,49 @@ class TrainerProfile(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    full_name: Mapped[str] = mapped_column(String(255), default="", nullable=False, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     specializations: Mapped[list[str] | None] = mapped_column(
         JSON, default=list, nullable=True
     )
+    certifications: Mapped[list[str] | None] = mapped_column(
+        JSON, default=list, nullable=True
+    )
+    years_of_experience: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
     hourly_rate: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False
     )
-    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        server_default=func.now(),
+        nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        server_default=func.now(),
+        nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        default=datetime.utcnow,
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
@@ -70,7 +100,21 @@ class TrainerProfile(Base):
 
     # Relationships
     gym: Mapped["Gym"] = relationship("Gym", back_populates="trainer_profiles")  # noqa: F821
-    user: Mapped["User"] = relationship("User", back_populates="trainer_profiles")  # noqa: F821
+    user: Mapped["User | None"] = relationship(
+        "User", back_populates="trainer_profiles", lazy="selectin"
+    )  # noqa: F821
+    branch: Mapped["GymBranch | None"] = relationship(
+        "GymBranch",
+        primaryjoin="and_(TrainerProfile.branch_id == GymBranch.id, TrainerProfile.gym_id == GymBranch.gym_id)",
+        foreign_keys="[TrainerProfile.gym_id, TrainerProfile.branch_id]",
+        lazy="selectin",
+        overlaps="gym,trainer_profiles",
+    )  # noqa: F821
+    assignments: Mapped[list["TrainerMemberAssignment"]] = relationship(
+        "TrainerMemberAssignment",
+        back_populates="trainer",
+        cascade="all, delete-orphan",
+    )
 
 
 class TrainerMemberAssignment(Base):
@@ -128,3 +172,9 @@ class TrainerMemberAssignment(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    trainer: Mapped["TrainerProfile"] = relationship(
+        "TrainerProfile", back_populates="assignments"
+    )
+    member: Mapped["Member"] = relationship("Member", overlaps="assignments,trainer")  # noqa: F821

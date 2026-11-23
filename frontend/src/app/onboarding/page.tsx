@@ -216,8 +216,10 @@ export default function OnboardingPage() {
           // Partial failure: Gym succeeded, but branch failed
           setBranchFailed(true);
           const msg =
-            branchErr instanceof ApiClientError
+            isApiClientError(branchErr)
               ? branchErr.detail
+              : branchErr instanceof Error
+              ? branchErr.message
               : "Failed to configure initial branch.";
           setGlobalError(
             `Gym "${gym.name}" was registered successfully, but branch creation encountered an error: ${msg}. You can retry branch creation or proceed to the dashboard.`
@@ -251,13 +253,25 @@ export default function OnboardingPage() {
           });
           setFieldErrors(errs);
           setGlobalError("Please check the form fields for validation errors.");
+        } else if (err.status === 0) {
+          setGlobalError(
+            "Unable to reach the FitCore API backend at http://localhost:8000. Please verify the FastAPI backend server is running and try again."
+          );
         } else {
-          setGlobalError(err.detail);
+          setGlobalError(err.detail || "Gym onboarding request failed. Please try again.");
         }
       } else if (err instanceof Error) {
-        setGlobalError(`Error: ${err.message}`);
+        if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+          setGlobalError(
+            "Unable to reach the FitCore API backend at http://localhost:8000. Please verify the FastAPI backend server is running and try again."
+          );
+        } else {
+          setGlobalError(`Error: ${err.message}`);
+        }
+      } else if (typeof err === "object" && err !== null && "message" in err && typeof (err as { message: unknown }).message === "string") {
+        setGlobalError((err as { message: string }).message);
       } else {
-        setGlobalError("An unexpected network error occurred. Please check your connection and try again.");
+        setGlobalError("Unable to reach the FitCore API backend at http://localhost:8000. Please verify the FastAPI backend server is running.");
       }
     } finally {
       setIsSubmitting(false);

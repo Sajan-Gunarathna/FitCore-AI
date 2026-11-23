@@ -133,6 +133,7 @@ async def run_migrations():
             "fk_subscription_member_composite",
             "fk_subscription_plan_composite",
             "fk_member_branch_composite",
+            "fk_trainer_branch_composite",
         ]
         for fk in expected_fks:
             assert fk in existing_fks, f"Missing composite foreign key '{fk}'"
@@ -161,7 +162,21 @@ async def run_migrations():
         assert sub_curr == "currency", "member_subscriptions.currency column missing"
         print("[OK] Multi-currency schema verified on membership_plans and member_subscriptions.")
 
-        # 6. Verify Auth users preservation
+        # 6. Verify Trainer schema extensions (Migration 000006)
+        trainer_user_id_null = await conn.fetchval("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'trainer_profiles' AND column_name = 'user_id';
+        """)
+        assert trainer_user_id_null == "YES", "trainer_profiles.user_id must be nullable for staff trainers"
+
+        view_exists = await conn.fetchval("""
+            SELECT table_name FROM information_schema.views
+            WHERE table_schema = 'public' AND table_name = 'trainer_directory';
+        """)
+        assert view_exists == "trainer_directory", "trainer_directory view missing from public schema"
+        print("[OK] Trainer management schema & secure trainer_directory view verified.")
+
+        # 7. Verify Auth users preservation
         post_auth_count = await conn.fetchval("SELECT count(*) FROM auth.users;")
         assert post_auth_count == initial_auth_count, "Auth users count changed during migrations"
         print(f"[OK] Auth users preserved: {post_auth_count} account(s) intact.")

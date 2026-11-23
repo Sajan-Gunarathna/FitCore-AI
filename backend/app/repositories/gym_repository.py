@@ -17,6 +17,7 @@ class GymRepository:
     async def create(self, gym: Gym) -> Gym:
         self.session.add(gym)
         await self.session.flush()
+        await self.session.refresh(gym)
         return gym
 
     async def get_by_id(self, gym_id: uuid.UUID) -> Gym | None:

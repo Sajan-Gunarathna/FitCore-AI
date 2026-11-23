@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiClient, ApiClientError } from "@/lib/api/client";
+import { apiClient, isApiClientError } from "@/lib/api/client";
 import type { GymDetailRead, GymRead } from "@/lib/api/types";
 
 const ACTIVE_GYM_STORAGE_KEY = "fitcore_active_gym_id";
@@ -132,7 +132,11 @@ export function GymProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        const msg = err instanceof ApiClientError ? err.detail : "Failed to load gyms";
+        const msg = isApiClientError(err)
+          ? err.detail
+          : err instanceof Error
+          ? err.message
+          : "Failed to load gyms";
         setError(msg);
       } finally {
         setIsLoading(false);
@@ -179,7 +183,11 @@ export function GymProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       } catch (err) {
-        const msg = err instanceof ApiClientError ? err.detail : "Failed to switch gym";
+        const msg = isApiClientError(err)
+          ? err.detail
+          : err instanceof Error
+          ? err.message
+          : "Failed to switch gym";
         setError(msg);
         return false;
       } finally {

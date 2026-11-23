@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, gyms, health, members, plans, subscriptions
+from app.api.v1.endpoints import auth, gyms, health, members, plans, subscriptions, trainers
 
 api_v1_router = APIRouter()
 
@@ -11,6 +11,11 @@ api_v1_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_v1_router.include_router(gyms.router, prefix="/gyms", tags=["Gyms"])
 api_v1_router.include_router(
     members.router, prefix="/gyms/{gym_id}/members", tags=["Members"]
+)
+api_v1_router.include_router(
+    trainers.router,
+    prefix="/gyms/{gym_id}/trainers",
+    tags=["Trainers"],
 )
 api_v1_router.include_router(
     plans.router,

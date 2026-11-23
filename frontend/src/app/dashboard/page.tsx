@@ -256,8 +256,105 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Card>
+          ) : currentRole === "trainer" ? (
+            /* State B1: Trainer Workspace & Portal (Milestone 2.6) */
+            <div className="space-y-6">
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-[#121922] via-[#16212D] to-[#121922] border border-[#27313D] shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full bg-[#B8FF3B]/10 border border-[#B8FF3B]/30 text-[#B8FF3B] text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                      <Dumbbell className="h-3.5 w-3.5" />
+                      Coach Workspace
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#1A232D] border border-[#27313D] text-xs font-semibold uppercase text-[#F8FAFC]">
+                      {activeGym?.name}
+                    </span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#F8FAFC]">
+                    Welcome back, Coach
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#94A3B8]">
+                    Manage your assigned training roster, track athlete coaching goals, and view your schedule.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link href="/dashboard/trainers">
+                    <Button variant="primary" size="md">
+                      <Users className="h-4 w-4" />
+                      <span>Coaching Directory</span>
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/members">
+                    <Button variant="secondary" size="md">
+                      <UserCheck className="h-4 w-4" />
+                      <span>My Assigned Members</span>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="border-[#27313D] bg-[#121922]">
+                  <CardHeader className="pb-3 border-b border-[#27313D]/40">
+                    <CardTitle className="text-sm font-bold text-[#F8FAFC] flex items-center gap-2">
+                      <Users className="h-4 w-4 text-[#B8FF3B]" />
+                      <span>Assigned Athletes</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-2 text-xs text-[#94A3B8]">
+                    <p>
+                      Access your athlete roster directly in the Members module. Your view is scoped to only athletes assigned to you.
+                    </p>
+                    <Link
+                      href="/dashboard/members"
+                      className="text-[#B8FF3B] font-semibold hover:underline inline-flex items-center gap-1 mt-2"
+                    >
+                      View Assigned Roster <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-[#27313D] bg-[#121922]">
+                  <CardHeader className="pb-3 border-b border-[#27313D]/40">
+                    <CardTitle className="text-sm font-bold text-[#F8FAFC] flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4 text-blue-400" />
+                      <span>Coach Profile</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-2 text-xs text-[#94A3B8]">
+                    <p>
+                      Keep your specializations, certifications, and professional bio updated for gym administrators and athletes.
+                    </p>
+                    <Link
+                      href="/dashboard/trainers"
+                      className="text-blue-400 font-semibold hover:underline inline-flex items-center gap-1 mt-2"
+                    >
+                      Open Trainer Directory <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-[#27313D] bg-[#121922]">
+                  <CardHeader className="pb-3 border-b border-[#27313D]/40">
+                    <CardTitle className="text-sm font-bold text-[#F8FAFC] flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                      <span>Tenant Security</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-2 text-xs text-[#94A3B8]">
+                    <p>
+                      FitCore AI protects member privacy with PostgreSQL Row-Level Security. Financial revenues are hidden from trainer roles.
+                    </p>
+                    <span className="text-[10px] font-mono text-emerald-400 block mt-2">
+                      RLS & RBAC Status: Enforced
+                    </span>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           ) : !isOwnerOrAdmin ? (
-            /* State B: Role-Restricted View for Members / Trainers */
+            /* State B2: Role-Restricted View for Members */
             <Card className="border-[#27313D] bg-[#121922] p-8 text-center shadow-xl">
               <CardContent className="max-w-md mx-auto space-y-4">
                 <div className="h-14 w-14 mx-auto rounded-2xl bg-[#1A232D] border border-[#27313D] flex items-center justify-center text-[#B8FF3B]">

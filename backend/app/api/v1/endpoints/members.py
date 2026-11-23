@@ -16,7 +16,15 @@ from app.schemas.member import (
     MemberStatusUpdate,
     MemberUpdate,
 )
+from app.schemas.trainer import (
+    MemberAssignTrainerInput,
+    MemberReassignTrainerInput,
+    MemberTrainerAssignmentRead,
+    TrainerMemberAssignmentCreate,
+    TrainerMemberReassignInput,
+)
 from app.services.member_service import MemberService
+from app.services.trainer_service import TrainerService
 
 router = APIRouter()
 
@@ -177,3 +185,134 @@ async def update_member_status(
         ip_address=client_ip,
         user_agent=user_agent,
     )
+
+
+# ── Trainer Assignment Endpoints (Member Perspective) ─────────────────────────
+
+
+@router.post(
+    "/{member_id}/trainer",
+    response_model=MemberTrainerAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Assign a trainer to a member",
+)
+async def assign_trainer_to_member(
+    gym_id: uuid.UUID,
+    member_id: uuid.UUID,
+    data: MemberAssignTrainerInput,
+    tenant: RequireGymAdmin,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MemberTrainerAssignmentRead:
+    """
+    Assign an active trainer to this member.
+    Requires Gym Owner or Gym Admin role.
+    """
+    trainer_service = TrainerService(session)
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    return await trainer_service.assign_member(
+        tenant=tenant,
+        trainer_id=data.trainer_id,
+        data=TrainerMemberAssignmentCreate(member_id=member_id, notes=data.notes),
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
+
+@router.patch(
+    "/{member_id}/trainer",
+    response_model=MemberTrainerAssignmentRead,
+    summary="Reassign member to another trainer",
+)
+async def reassign_trainer_for_member(
+    gym_id: uuid.UUID,
+    member_id: uuid.UUID,
+    data: MemberReassignTrainerInput,
+    tenant: RequireGymAdmin,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MemberTrainerAssignmentRead:
+    """
+    Atomically reassign member to a new trainer.
+    Requires Gym Owner or Gym Admin role.
+    """
+    from fastapi import HTTPException
+
+    trainer_service = TrainerService(session)
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    current_trainer_id = data.current_trainer_id
+    if not current_trainer_id:
+        active_assignments = (
+            await trainer_service.trainer_repo.get_active_assignments_for_member(
+                tenant.gym_id, member_id
+            )
+        )
+        if not active_assignments:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Member currently has no active trainer assignment to reassign.",
+            )
+        current_trainer_id = active_assignments[0][0].trainer_id
+
+    return await trainer_service.reassign_member(
+        tenant=tenant,
+        current_trainer_id=current_trainer_id,
+        member_id=member_id,
+        data=TrainerMemberReassignInput(
+            new_trainer_id=data.new_trainer_id, notes=data.notes
+        ),
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
+
+@router.delete(
+    "/{member_id}/trainer",
+    summary="Unassign trainer from member",
+)
+async def unassign_trainer_from_member(
+    gym_id: uuid.UUID,
+    member_id: uuid.UUID,
+    tenant: RequireGymAdmin,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    trainer_id: uuid.UUID | None = Query(
+        None, description="Trainer ID to unassign; if omitted, unassigns active trainer"
+    ),
+) -> dict[str, str]:
+    """
+    Unassign trainer from this member.
+    Requires Gym Owner or Gym Admin role.
+    """
+    from fastapi import HTTPException
+
+    trainer_service = TrainerService(session)
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    target_trainer_id = trainer_id
+    if not target_trainer_id:
+        active_assignments = (
+            await trainer_service.trainer_repo.get_active_assignments_for_member(
+                tenant.gym_id, member_id
+            )
+        )
+        if not active_assignments:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Member has no active trainer assignment.",
+            )
+        target_trainer_id = active_assignments[0][0].trainer_id
+
+    return await trainer_service.unassign_member(
+        tenant=tenant,
+        trainer_id=target_trainer_id,
+        member_id=member_id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
